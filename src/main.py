@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import threading
 from typing import Any, Optional, cast
 
 from web3 import Web3
@@ -47,8 +48,12 @@ class NodeLifecycle:
 
     def __init__(self: NodeLifecycle):
         self._tasks: list[AsyncTask] = []
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
         self._asyncio_tasks: list[asyncio.Task[Any]] = []
         self._stat_sender: Optional[StatSender] = None
+        self._shutdown_event = threading.Event()
+        self._signal_queue = asyncio.Queue()
 
     def on_startup(self: NodeLifecycle) -> None:
         """Node startup
@@ -271,21 +276,55 @@ class NodeLifecycle:
         """
 
         # Get asyncio event loop
-        loop = asyncio.get_event_loop()
+        # loop = asyncio.get_event_loop()
+        self._loop.run_until_complete(self._lifecycle_setup())
 
         # Run lifecycle setup
-        loop.run_until_complete(self._lifecycle_setup())
+        # loop.run_until_complete(self._lifecycle_setup())
 
         # Register signal handlers for graceful shutdown
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, lambda: asyncio.create_task(self._shutdown()))
+        # for sig in (signal.SIGTERM, signal.SIGINT):
+        #     loop.add_signal_handler(sig, lambda: asyncio.create_task(self._shutdown()))
 
-        # Run lifecycle
-        exit_code = loop.run_until_complete(self._lifecycle_run())
+        try:
+            # Run lifecycle
+            exit_code = self._loop.run_until_complete(self._lifecycle_run())
+
+            # Register signal handlers in main thread
+            signal.signal(signal.SIGTERM, self.handle_signal)
+            signal.signal(signal.SIGINT, self.handle_signal)
+
+            # Start a new thread to handle signals
+            signal_thread = threading.Thread(target=self._monitor_signals)
+            signal_thread.start()
+
+        except KeyboardInterrupt:
+            log.info("Keyboard interrupt received, shutting down")
+            exit_code = 1
+        finally:
+            self._loop.run_until_complete(self._shutdown())
+            self._loop.close()
+
+        # # # Run lifecycle
+        # exit_code = loop.run_until_complete(self._lifecycle_run())
 
         # Exit with exit code
         exit(exit_code)
 
+    def handle_signal(self: NodeLifecycle) -> None:
+        """Handle signal for graceful shutdown"""
+        log.info("Received signal, shutting down")
+        # self._shutdown_event.set()
+        self._signal_queue.put_nowait("shutdown")
+
+    def _monitor_signals(self):
+        while not self._shutdown_event.is_set():
+            try:
+                message = self._signal_queue.get(timeout=1)
+                if message == "shutdown":
+                    self._loop.call_soon_threadsafe(self._shutdown)
+            except Empty:
+                continue
 
 if __name__ == "__main__":
     node = NodeLifecycle()

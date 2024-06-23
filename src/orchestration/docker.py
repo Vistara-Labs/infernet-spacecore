@@ -32,7 +32,7 @@ Example:
 
 from __future__ import annotations
 
-from asyncio import gather, get_event_loop, sleep
+from asyncio import gather, get_event_loop, sleep, new_event_loop, set_event_loop
 from typing import Any, Optional
 
 from docker import from_env  # type: ignore
@@ -104,17 +104,28 @@ class ContainerManager(AsyncTask):
         self._port_mappings: dict[str, int] = {
             config["id"]: config["port"] for config in self._configs
         }
-        self._loop = get_event_loop()
+        # Ensure an event loop is set for the current thread
+        try:
+            self._loop = get_event_loop()
+        except RuntimeError as e:
+            if "There is no current event loop in thread" in str(e):
+                self._loop = new_event_loop()
+                set_event_loop(self._loop)
+
         self._shutdown = False
 
         self._startup_wait = (
             DEFAULT_STARTUP_WAIT if startup_wait is None else startup_wait
         )
-        self._managed = True if managed is None else managed
+        self._managed = False if managed is None else managed # original default to True
+
+        self._loop = get_event_loop() if managed else None
 
         # Store container objects in state. Only used if managed is True
         self._containers: dict[str, Container] = {}
 
+        print("managed: ", self._managed)
+        print("configs: ", self._configs)
         # Docker daemon must be running on host. Only used if managed is True
         self.client = from_env() if self._managed else None
 

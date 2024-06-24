@@ -3,10 +3,10 @@ block_cipher = None
 
 a = Analysis(
     ['src/plugin.py'],
-    pathex=["/Users/mayurchougule/development/ritual/infernet-node"],
+    pathex=["/root/infernet-spacecore"],
     binaries=[],
-    datas=[("/Users/mayurchougule/miniconda3/envs/infern/lib/python3.11/site-packages/pyfiglet/fonts/", "pyfiglet/fonts/")],
-    hiddenimports=[],
+    datas=[("/root/miniconda/envs/infern/lib/python3.11/site-packages/pyfiglet/fonts/", "pyfiglet/fonts/")],
+    hiddenimports=['rich', 'structlog', 'grpc', 'grpc_tools', 'grpc._cython', 'grpc._cython.cygrpc'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

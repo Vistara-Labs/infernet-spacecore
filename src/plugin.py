@@ -46,12 +46,16 @@ class ScPluginServicer(sc_pb2_grpc.ScPluginServicer):
 
 async def serve():
     logger.info("Starting Anvil...")
-    # anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/CygH7Y6PEyNCuKF6NFcG6DxYRXqI4zE2
-    anvil_proc = subprocess.Popen(["anvil", "--fork-url", "https://eth-mainnet.g.alchemy.com/v2/CygH7Y6PEyNCuKF6NFcG6DxYRXqI4zE2"])
+    anvil_log = open("/tmp/anvil.log", "w")
+    anvil_proc = subprocess.Popen(
+        ["anvil", "--fork-url", "https://eth-mainnet.g.alchemy.com/v2/CygH7Y6PEyNCuKF6NFcG6DxYRXqI4zE2"],
+        stdout=anvil_log, stderr=anvil_log
+    )
 
     # Start Redis
     logger.info("Starting Redis server...")
-    redis_proc = subprocess.Popen(["redis-server"])
+    redis_log = open("/tmp/redis.log", "w")
+    redis_proc = subprocess.Popen(["redis-server"], stdout=redis_log, stderr=redis_log)
 
     # We need to build a health service to work with go-plugin
     health = HealthServicer()
@@ -65,7 +69,7 @@ async def serve():
     await server.start()
 
     # Output information
-    print("1|1|tcp|0.0.0.0:1234|grpc")
+    logger.info("1|1|tcp|0.0.0.0:1234|grpc")
     sys.stdout.flush()
 
     try:

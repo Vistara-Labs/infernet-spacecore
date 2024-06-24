@@ -1,6 +1,3 @@
-# Copyright (c) HashiCorp, Inc.
-# SPDX-License-Identifier: MPL-2.0
-
 from concurrent import futures
 import sys
 import time
@@ -17,8 +14,9 @@ from proto import sc_pb2
 from proto import sc_pb2_grpc
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 class ScPluginServicer(sc_pb2_grpc.ScPluginServicer):
     """Implementation of SC Plugin service."""
